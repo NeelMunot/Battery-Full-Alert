@@ -1,0 +1,5 @@
+psutil
+win10toast
+pygame
+pystray
+Pillow
