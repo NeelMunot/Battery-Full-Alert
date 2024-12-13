@@ -1,4 +1,3 @@
-```markdown
 # Battery Monitor
 
 A Windows application developed through AI pair programming with GitHub Copilot to prevent battery overcharging.
