@@ -117,12 +117,13 @@ class BatteryMonitor:
         
     def update_sound_label(self):
         if self.sound_file.get() == "default":
-            self.sound_label.config(text="Current Sound: Default")
-        elif self.last_valid_sound:
+            self.sound_label.config(text="Current Sound: Default Beep")
+        elif self.last_valid_sound and os.path.exists(self.last_valid_sound):
             filename = os.path.basename(self.last_valid_sound)
             self.sound_label.config(text=f"Current Sound: {filename}")
         else:
             self.sound_label.config(text="Current Sound: No file selected")
+            self.sound_file.set("default")  # Fallback to default if file not found
         
     def on_slider_change(self, value):
         try:
@@ -174,10 +175,9 @@ class BatteryMonitor:
             ]
         )
         if file_path:
-            self.sound_file.set("custom")  # Switch to custom mode
             self.last_valid_sound = file_path
-            filename = os.path.basename(file_path)
-            self.sound_label.config(text=f"Current Sound: {filename}")
+            self.sound_file.set("custom")
+            self.update_sound_label()
             self.save_settings()
             
     def play_alarm(self):
@@ -252,44 +252,38 @@ class BatteryMonitor:
             self.toggle_controls('normal')
             
     def load_settings(self):
-        settings_path = resource_path('battery_monitor_settings.json')
+        settings_path = os.path.join(os.path.dirname(__file__), 'settings.json')
         try:
             with open(settings_path, 'r') as f:
                 settings = json.load(f)
-                # Load threshold
+                # Restore threshold
                 self.alert_percentage.set(settings.get('threshold', 90))
-                
-                # Load sound settings
-                self.last_valid_sound = settings.get('last_valid_sound')
-                sound_file = settings.get('sound_file', 'default')
-                self.sound_file.set(sound_file)
-                
-                # Update sound label
-                if hasattr(self, 'sound_label'):
-                    if sound_file == 'default':
-                        self.sound_label.config(text="Current Sound: Default Beep")
-                    elif self.last_valid_sound:
-                        filename = os.path.basename(self.last_valid_sound)
-                        self.sound_label.config(text=f"Current Sound: {filename}")
+                # Restore sound settings
+                self.sound_file.set(settings.get('sound_mode', 'default'))
+                self.last_valid_sound = settings.get('custom_sound_path')
+                self.update_sound_label()
         except FileNotFoundError:
-            # Set defaults if no settings file
+            # Set defaults
             self.alert_percentage.set(90)
             self.sound_file.set('default')
             self.last_valid_sound = None
-            
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+
     def save_settings(self):
         settings = {
             'threshold': self.alert_percentage.get(),
-            'sound_file': self.sound_file.get(),
-            'last_valid_sound': self.last_valid_sound  # Save last valid sound path
+            'sound_mode': self.sound_file.get(),
+            'custom_sound_path': self.last_valid_sound if self.sound_file.get() == 'custom' else None
         }
-        settings_path = resource_path('battery_monitor_settings.json')
+        
+        settings_path = os.path.join(os.path.dirname(__file__), 'settings.json')
         try:
             with open(settings_path, 'w') as f:
                 json.dump(settings, f)
         except Exception as e:
             print(f"Error saving settings: {e}")
-            
+
     def run(self):
         self.root.mainloop()
         
