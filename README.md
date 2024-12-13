@@ -61,7 +61,7 @@ pip install pyinstaller
 
 2. Create executable:
 ```bash
-pyinstaller --onefile --noconsole battery_monitoring.py
+pyinstaller --onefile --noconsole --icon=icon.ico battery_monitoring.py
 ```
 
 3. Find the executable in the dist folder
