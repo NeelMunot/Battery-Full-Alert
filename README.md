@@ -64,11 +64,7 @@ pip install pyinstaller
 pyinstaller --onefile --noconsole battery_monitoring.py
 ```
 
-3. Find the executable in the 
-
-dist
-
- folder
+3. Find the executable in the dist folder
 
 ## Usage
 
@@ -78,11 +74,7 @@ python battery_monitoring.py
 ```
 
 ### Running Executable
-1. Navigate to 
-
-dist
-
- folder
+1. Navigate to dist folder
 2. Run `battery_monitoring.exe`
 
 ### Features Usage
@@ -131,4 +123,3 @@ MIT License - Feel free to use and modify for your needs.
 - Python community for excellent libraries
 - Open source contributors
 
-```
