@@ -25,3 +25,4 @@ battery_monitor_settings.json
 
 # VS Code
 .vscode/
+battery_monitoring.spec
