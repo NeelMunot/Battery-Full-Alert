@@ -17,6 +17,9 @@ import uuid
 
 class BatteryMonitor:
     def __init__(self):
+        # Initialize pygame mixer first
+        pygame.mixer.init()
+        
         self.root = tk.Tk()
         self.root.title("Battery Monitor")
         self.root.geometry("400x300")
@@ -49,10 +52,9 @@ class BatteryMonitor:
         
         self.create_ui()  # Create UI first
         self.load_settings()  # Load settings after UI is created
-        pygame.mixer.init()
         
         # Configure window close button
-        self.root.protocol('WM_DELETE_WINDOW', self.hide_window)
+        self.root.protocol('WM_DELETE_WINDOW', self.minimize_to_tray)
 
     def get_resource_path(self):
         if getattr(sys, 'frozen', False):
@@ -215,34 +217,24 @@ class BatteryMonitor:
             self.save_settings()
             
     def play_alarm(self):
-        self.playing_audio = True
-        while self.monitoring and psutil.sensors_battery().power_plugged and self.playing_audio:
-            try:
-                if self.sound_file.get() == "default":
-                    winsound.Beep(2500, 1000)
-                else:
-                    # Try to use stored custom sound
-                    sound_to_play = self.last_valid_sound if self.last_valid_sound else self.sound_file.get()
-                    
-                    # Check if file exists and is accessible
-                    if sound_to_play and os.path.exists(sound_to_play):
-                        pygame.mixer.music.load(sound_to_play)
-                        pygame.mixer.music.play()
-                        while pygame.mixer.music.get_busy() and self.playing_audio:
-                            if not self.monitoring or not psutil.sensors_battery().power_plugged:
-                                pygame.mixer.music.stop()
-                                break
-                            time.sleep(0.1)
-                    else:
-                        # Fallback to default beep
-                        print("Custom sound file not found, using default beep")
-                        winsound.Beep(2500, 1000)
-                        
-                if self.playing_audio:
-                    time.sleep(1)
-            except Exception as e:
-                print(f"Error playing sound: {e}")
+        try:
+            self.playing_audio = True
+            if self.sound_file.get() == "custom" and self.last_valid_sound and os.path.exists(self.last_valid_sound):
+                pygame.mixer.music.load(self.last_valid_sound)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy() and self.playing_audio:
+                    if not self.monitoring or not psutil.sensors_battery().power_plugged:
+                        pygame.mixer.music.stop()
+                        break
+                    time.sleep(0.1)
+            else:
                 winsound.Beep(2500, 1000)
+                
+            if self.playing_audio:
+                time.sleep(1)
+        except Exception as e:
+            print(f"Error playing sound: {e}")
+            winsound.Beep(2500, 1000)
 
     def stop_alarm(self):
         self.playing_audio = False
@@ -253,14 +245,18 @@ class BatteryMonitor:
             battery = psutil.sensors_battery()
             if battery:
                 current_percentage = battery.percent
-                if current_percentage >= self.alert_percentage.get() and battery.power_plugged:
-                    self.toaster.show_toast("Battery Alert",
-                                          f"Battery at {current_percentage}%! Please unplug.",
-                                          duration=5,
-                                          threaded=True)
-                    threading.Thread(target=self.play_alarm).start()
-                elif not battery.power_plugged:
-                    self.stop_alarm()
+                if battery.power_plugged and current_percentage >= self.alert_percentage.get():
+                    self.toaster.show_toast(
+                        "Battery Monitor",
+                        f"Battery at {current_percentage}%! Please unplug.",
+                        duration=5,
+                        threaded=True
+                    )
+                    # Start alarm in separate thread to prevent UI blocking
+                    if not hasattr(self, 'alarm_thread') or not self.alarm_thread.is_alive():
+                        self.alarm_thread = threading.Thread(target=self.play_alarm)
+                        self.alarm_thread.daemon = True
+                        self.alarm_thread.start()
             time.sleep(5)
             
     def toggle_controls(self, state):
@@ -333,15 +329,14 @@ class BatteryMonitor:
     def run(self):
         self.root.mainloop()
         
-    def hide_window(self):
+    def minimize_to_tray(self):
+        """Hide window instead of destroying"""
         self.root.withdraw()
-        self.create_tray_icon()
-        self.icon.run()
-
-    def show_window(self):
-        self.icon.stop()
-        self.root.after(0, self.root.deiconify)
         
+    def show_window(self):
+        """Restore window from tray"""
+        self.root.deiconify()
+
     def quit_app(self):
         self.monitoring = False
         self.stop_alarm()
