@@ -1,30 +1,34 @@
 import sys
 import os
 from cx_Freeze import setup, Executable
+import pygame
+
+# Get pygame directory with DLLs
+pygame_dir = os.path.dirname(pygame.__file__)
 
 APP_NAME = "Battery Monitor"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DESCRIPTION = "Battery Monitoring Application"
 
-# Ensure resources exist
-resources_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources')
-audio_dir = os.path.join(resources_dir, 'audio')
-os.makedirs(audio_dir, exist_ok=True)
-
+# Include pygame DLLs and dependencies
 build_exe_options = {
-    "packages": ["os", "sys", "json", "psutil", "pygame", "win10toast", "threading"],
+    "packages": [
+        "os", "sys", "json", "psutil", "pygame", "win10toast", 
+        "threading", "PIL", "pystray"
+    ],
     "includes": ["tkinter"],
     "include_files": [
         ("resources", "resources"),
-        ("settings.json", "settings.json")
+        ("settings.json", "settings.json"),
+        (pygame_dir, os.path.join("lib", "pygame")),  # Include pygame files
     ],
     "include_msvcr": True,
-    "excludes": []
+    "excludes": [],
+    "zip_include_packages": "*",
+    "zip_exclude_packages": "pygame"  # Exclude pygame from zip to avoid DLL issues
 }
 
-base = None
-if sys.platform == "win32":
-    base = "Win32GUI"
+base = "Win32GUI" if sys.platform == "win32" else None
 
 executables = [
     Executable(

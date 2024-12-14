@@ -17,10 +17,32 @@ import uuid
 
 class BatteryMonitor:
     def __init__(self):
-        # Initialize pygame mixer first
         pygame.mixer.init()
-        
         self.root = tk.Tk()
+        self.icon = None
+        
+        # Get application path and resources
+        if getattr(sys, 'frozen', False):
+            self.app_path = os.path.dirname(sys.executable)
+        else:
+            self.app_path = os.path.dirname(os.path.abspath(__file__))
+            
+        # Initialize notification with app identity
+        try:
+            self.notifier = ToastNotifier()
+            # Create notification with app info
+            self.notifier.show_toast(
+                "Battery Monitor",
+                "Application started",
+                duration=1,
+                threaded=True,
+                icon_path=os.path.join(self.app_path, "resources", "icon.ico")
+            )
+        except Exception as e:
+            print(f"Notification error: {e}")
+            # Fallback to tray icon alert
+            self.show_tray_message = True
+        
         self.root.title("Battery Monitor")
         self.root.geometry("400x300")
         
@@ -55,6 +77,7 @@ class BatteryMonitor:
         
         # Configure window close button
         self.root.protocol('WM_DELETE_WINDOW', self.minimize_to_tray)
+        self.create_tray_icon()
 
     def get_resource_path(self):
         if getattr(sys, 'frozen', False):
@@ -240,19 +263,33 @@ class BatteryMonitor:
         self.playing_audio = False
         pygame.mixer.music.stop()
 
+    def show_notification(self, title, message):
+        try:
+            if hasattr(self, 'show_tray_message'):
+                # Fallback to tray notification
+                self.icon.notify(title, message)
+            else:
+                self.notifier.show_toast(
+                    title,
+                    message,
+                    duration=5,
+                    threaded=True,
+                    icon_path=os.path.join(self.app_path, "resources", "icon.ico")
+                )
+        except Exception as e:
+            print(f"Notification error: {e}")
+
     def monitor_battery(self):
         while self.monitoring:
             battery = psutil.sensors_battery()
             if battery:
                 current_percentage = battery.percent
                 if battery.power_plugged and current_percentage >= self.alert_percentage.get():
-                    self.toaster.show_toast(
+                    self.show_notification(
                         "Battery Monitor",
-                        f"Battery at {current_percentage}%! Please unplug.",
-                        duration=5,
-                        threaded=True
+                        f"Battery at {current_percentage}%! Please unplug."
                     )
-                    # Start alarm in separate thread to prevent UI blocking
+                    # Start alarm thread
                     if not hasattr(self, 'alarm_thread') or not self.alarm_thread.is_alive():
                         self.alarm_thread = threading.Thread(target=self.play_alarm)
                         self.alarm_thread.daemon = True
@@ -330,38 +367,49 @@ class BatteryMonitor:
         self.root.mainloop()
         
     def minimize_to_tray(self):
-        """Hide window instead of destroying"""
+        if not hasattr(self, 'icon') or not self.icon:
+            self.create_tray_icon()
         self.root.withdraw()
-        
-    def show_window(self):
-        """Restore window from tray"""
-        self.root.deiconify()
 
-    def quit_app(self):
+    def show_window(self, *args):
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+
+    def quit_app(self, *args):
         self.monitoring = False
-        self.stop_alarm()
-        self.icon.stop()
+        if hasattr(self, 'icon') and self.icon:
+            self.icon.stop()
         self.root.destroy()
+        sys.exit()
 
     def create_tray_icon(self):
-        # Create tray icon image (16x16 black square with white B)
-        image = Image.new('RGB', (16, 16), color='black')
-        d = ImageDraw.Draw(image)
-        d.text((4, 2), "B", fill='white')
-        
-        # Create menu
-        menu = (
-            item('Open', self.show_window),
-            item('Quit', self.quit_app)
-        )
-        
-        # Create tray icon
-        self.icon = pystray.Icon(
-            "battery_monitor",
-            image,
-            "Battery Monitor",
-            menu
-        )
+        if self.icon:
+            return True
+            
+        try:
+            icon_image = Image.new('RGBA', (64, 64), color=(0, 120, 212, 255))
+            draw = ImageDraw.Draw(icon_image)
+            draw.text((20, 20), "BM", fill='white')
+            
+            menu = (
+                item('Open', self.show_window),
+                item('Exit', self.quit_app)
+            )
+            
+            self.icon = pystray.Icon(
+                name="BatteryMonitor",
+                icon=icon_image,
+                title="Battery Monitor",
+                menu=menu
+            )
+            
+            icon_thread = threading.Thread(target=self.icon.run, daemon=True)
+            icon_thread.start()
+            return True
+        except Exception as e:
+            print(f"Tray icon error: {e}")
+            return False
 
 def resource_path(relative_path):
     """Get absolute path to resource for PyInstaller"""
