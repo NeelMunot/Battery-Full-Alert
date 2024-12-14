@@ -35,6 +35,17 @@ This project was born from a personal need to protect my laptop's battery life b
 
 ## Installation
 
+### Method 1: Windows Installer
+1. Download the latest `.msi` installer from the releases page
+2. Run the installer and follow the setup wizard
+3. The application will be installed in Program Files
+4. A desktop shortcut will be created automatically
+
+### Method 2: Manual Installation
+1. Clone the repository
+2. Install dependencies: `pip install -r requirements.txt`
+3. Run `python battery_monitoring.py`
+
 ### From Source
 1. Clone the repository:
 ```bash
