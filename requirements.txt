@@ -3,3 +3,4 @@ win10toast
 pygame
 pystray
 Pillow
+cx_Freeze

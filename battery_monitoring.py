@@ -1,23 +1,38 @@
-import tkinter as tk
-from tkinter import ttk, filedialog
-import psutil
-import winsound
-import threading
+import os
+import sys
 import json
 import time
-from win10toast import ToastNotifier
-import os
+import psutil
 import pygame
-from pygame import mixer
+import threading
+import tkinter as tk
+from tkinter import ttk, filedialog
+from win10toast import ToastNotifier
+import winsound
 import pystray
 from pystray import MenuItem as item
 from PIL import Image, ImageDraw
+import shutil
+import uuid
 
 class BatteryMonitor:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Battery Monitor")
         self.root.geometry("400x300")
+        
+        # Set up directory paths
+        if getattr(sys, 'frozen', False):
+            self.app_dir = os.path.dirname(sys.executable)
+        else:
+            self.app_dir = os.path.dirname(os.path.abspath(__file__))
+            
+        self.resources_dir = os.path.join(self.app_dir, 'resources')
+        self.audio_dir = os.path.join(self.resources_dir, 'audio')
+        
+        # Create directories if not frozen
+        if not getattr(sys, 'frozen', False):
+            os.makedirs(self.audio_dir, exist_ok=True)
         
         # Initialize all instance variables first
         self.alert_percentage = tk.IntVar(value=90)
@@ -38,6 +53,11 @@ class BatteryMonitor:
         
         # Configure window close button
         self.root.protocol('WM_DELETE_WINDOW', self.hide_window)
+
+    def get_resource_path(self):
+        if getattr(sys, 'frozen', False):
+            return os.path.join(os.path.dirname(sys.executable))
+        return os.path.dirname(os.path.abspath(__file__))
 
     def create_ui(self):
         # Battery threshold setting
@@ -175,7 +195,21 @@ class BatteryMonitor:
             ]
         )
         if file_path:
-            self.last_valid_sound = file_path
+            # Generate unique filename
+            ext = os.path.splitext(file_path)[1]
+            new_filename = f"custom_sound_{uuid.uuid4()}{ext}"
+            new_path = os.path.join(self.audio_dir, new_filename)
+            
+            # Remove old custom sound if exists
+            if self.last_valid_sound and os.path.exists(self.last_valid_sound):
+                try:
+                    os.remove(self.last_valid_sound)
+                except OSError:
+                    pass
+            
+            # Copy new file
+            shutil.copy2(file_path, new_path)
+            self.last_valid_sound = new_path
             self.sound_file.set("custom")
             self.update_sound_label()
             self.save_settings()
@@ -252,18 +286,25 @@ class BatteryMonitor:
             self.toggle_controls('normal')
             
     def load_settings(self):
-        settings_path = os.path.join(os.path.dirname(__file__), 'settings.json')
+        settings_path = os.path.join(self.app_dir, 'settings.json')
         try:
             with open(settings_path, 'r') as f:
                 settings = json.load(f)
-                # Restore threshold
                 self.alert_percentage.set(settings.get('threshold', 90))
-                # Restore sound settings
                 self.sound_file.set(settings.get('sound_mode', 'default'))
-                self.last_valid_sound = settings.get('custom_sound_path')
+                
+                # Convert relative path to absolute
+                relative_path = settings.get('custom_sound_path')
+                if relative_path:
+                    self.last_valid_sound = os.path.join(self.app_dir, relative_path)
+                    if not os.path.exists(self.last_valid_sound):
+                        self.last_valid_sound = None
+                        self.sound_file.set('default')
+                else:
+                    self.last_valid_sound = None
+                
                 self.update_sound_label()
         except FileNotFoundError:
-            # Set defaults
             self.alert_percentage.set(90)
             self.sound_file.set('default')
             self.last_valid_sound = None
@@ -271,13 +312,18 @@ class BatteryMonitor:
             print(f"Error loading settings: {e}")
 
     def save_settings(self):
+        # Convert absolute path to relative
+        relative_path = None
+        if self.last_valid_sound and os.path.exists(self.last_valid_sound):
+            relative_path = os.path.relpath(self.last_valid_sound, self.app_dir)
+        
         settings = {
             'threshold': self.alert_percentage.get(),
             'sound_mode': self.sound_file.get(),
-            'custom_sound_path': self.last_valid_sound if self.sound_file.get() == 'custom' else None
+            'custom_sound_path': relative_path
         }
         
-        settings_path = os.path.join(os.path.dirname(__file__), 'settings.json')
+        settings_path = os.path.join(self.app_dir, 'settings.json')
         try:
             with open(settings_path, 'w') as f:
                 json.dump(settings, f)
