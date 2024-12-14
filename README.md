@@ -31,7 +31,7 @@ This project was born from a personal need to protect my laptop's battery life b
   - pygame
   - pystray
   - Pillow
-  - pyinstaller (for creating executable)
+  - cx_Freeze (for building installer)
 
 ## Installation
 
@@ -64,18 +64,19 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### Creating Executable
-1. Install PyInstaller if not already installed:
+### Building from Source
+1. Install build dependencies:
 ```bash
-pip install pyinstaller
+pip install cx_Freeze
 ```
 
-2. Create executable:
+2. Build MSI installer:
 ```bash
-pyinstaller --onefile --noconsole --icon=icon.ico battery_monitoring.py
+python setup.py bdist_msi
 ```
 
-3. Find the executable in the dist folder
+3. Installer will be created in dist folder.
+
 
 ## Usage
 
@@ -84,10 +85,15 @@ pyinstaller --onefile --noconsole --icon=icon.ico battery_monitoring.py
 python battery_monitoring.py
 ```
 
-### Running Executable
-1. Navigate to dist folder
-2. Run `battery_monitoring.exe`
+### Running Executable after building  
+1. Navigate to dist folder after building installer
+2. Run the `.msi` file and install the application
+3. Launch from desktop shortcut
 
+### Windows Installer
+1. Download latest installer form https://github.com/NeelMunot/Battery-Full-Alert/releases/
+2. Run Installer
+3. Launch from Desktop Shortcut. (All the necessary dependencies are included. Python need not be installed)
 ### Features Usage
 1. Set desired battery threshold using slider or input box
 2. Choose between default or custom alert sound
